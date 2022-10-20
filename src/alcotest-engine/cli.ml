@@ -37,6 +37,26 @@ module Make (P : Platform.MAKER) (M : Monad.S) :
   module P = P (M)
   open Cmdliner_syntax
 
+  let ci_env =
+    let values = [ "true"; "false" ] in
+    let doc =
+      Printf.sprintf "Whether Alcotest is running in a CI system, must be %s."
+        (Cmdliner.Arg.doc_alts values)
+    in
+    Cmdliner.Cmd.Env.info "CI" ~doc
+
+  let github_action_env =
+    let values = [ "true"; "false" ] in
+    let doc =
+      Printf.sprintf
+        "Whether Alcotest is running in GitHub Actions, must be %s. Display \
+         tests errors and outputs GitHub Actions annotations."
+        (Cmdliner.Arg.doc_alts values)
+    in
+    Cmdliner.Cmd.Env.info "GITHUB_ACTION" ~doc
+
+  let envs = [ ci_env; github_action_env ]
+
   let set_color =
     let env = Cmd.Env.info "ALCOTEST_COLOR" in
     let+ color_flag =
@@ -56,39 +76,45 @@ module Make (P : Platform.MAKER) (M : Monad.S) :
       match color_flag with
       | Some `Auto -> None
       | Some (`Ansi_tty | `None) as a -> a
-      | None -> (
-          try
-            (* Default to [always] when running inside Dune *)
-            let (_ : string) = Sys.getenv "INSIDE_DUNE" in
-            Some `Ansi_tty
-          with Not_found -> None)
+      | None ->
+          let inside_dune =
+            match Sys.getenv "INSIDE_DUNE" with
+            | exception Not_found -> false
+            | _ -> true
+          in
+          (* Default to [always] when running inside Dune or GitHub Actions *)
+          if inside_dune then Some `Ansi_tty else None
     in
     P.setup_std_outputs ?style_renderer ()
 
   let default_cmd config args library_name tests =
     let and_exit = Config.User.and_exit config
-    and record_backtrace = Config.User.record_backtrace config in
+    and record_backtrace = Config.User.record_backtrace config
+    and github_action = Config.User.github_action config in
     let exec_name = Filename.basename Sys.argv.(0) in
     let doc = "Run all the tests." in
     let term =
       let+ () = set_color
-      and+ cli_config = Config.User.term ~and_exit ~record_backtrace
+      and+ cli_config =
+        Config.User.term ~and_exit ~record_backtrace ~github_action
       and+ args = args in
       let config = Config.User.(cli_config || config) in
       run_with_args' config library_name args tests
     in
-    (term, Cmd.info exec_name ~doc)
+    (term, Cmd.info exec_name ~doc ~envs)
 
   let test_cmd config args library_name tests =
+    let github_action = Config.User.github_action config in
     let doc = "Run a subset of the tests." in
     let term =
       let+ () = set_color
-      and+ cli_config = Config.User.term ~and_exit:true ~record_backtrace:true
+      and+ cli_config =
+        Config.User.term ~and_exit:true ~record_backtrace:true ~github_action
       and+ args = args in
       let config = Config.User.(cli_config || config) in
       run_with_args' config library_name args tests
     in
-    (term, Cmd.info "test" ~doc)
+    (term, Cmd.info "test" ~doc ~envs)
 
   let list_cmd tests =
     let doc = "List all available tests." in
@@ -121,10 +147,11 @@ module Make (P : Platform.MAKER) (M : Monad.S) :
     | Error `Exn -> exit Cmd.Exit.internal_error
 
   let run_with_args ?and_exit ?verbose ?compact ?tail_errors ?quick_only
-      ?show_errors ?json ?filter ?log_dir ?bail ?record_backtrace ?argv =
+      ?show_errors ?json ?filter ?log_dir ?bail ?record_backtrace ?github_action
+      ?argv =
     Config.User.kcreate (run_with_args' ~argv) ?and_exit ?verbose ?compact
       ?tail_errors ?quick_only ?show_errors ?json ?filter ?log_dir ?bail
-      ?record_backtrace
+      ?record_backtrace ?github_action
 
   let run =
     Config.User.kcreate (fun config ?argv name tl ->

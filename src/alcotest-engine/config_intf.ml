@@ -13,7 +13,8 @@ module Types = struct
     ; filter : filter option
     ; log_dir : string
     ; bail : bool
-    ; record_backtrace : bool >
+    ; record_backtrace : bool
+    ; github_action : bool >
 
   type 'a with_options =
     ?and_exit:bool ->
@@ -27,6 +28,7 @@ module Types = struct
     ?log_dir:string ->
     ?bail:bool ->
     ?record_backtrace:bool ->
+    ?github_action:bool ->
     'a
 end
 
@@ -45,7 +47,11 @@ module type Config = sig
     (** Like [create], but passes the constructed config to a continuation
         rather than returning directly. *)
 
-    val term : and_exit:bool -> record_backtrace:bool -> t Cmdliner.Term.t
+    val term :
+      and_exit:bool ->
+      record_backtrace:bool ->
+      github_action:bool ->
+      t Cmdliner.Term.t
     (** [term] provides a command-line interface for building configs. *)
 
     val ( || ) : t -> t -> t
@@ -56,6 +62,7 @@ module type Config = sig
 
     val and_exit : t -> bool
     val record_backtrace : t -> bool
+    val github_action : t -> bool
   end
 
   val apply_defaults : default_log_dir:string -> User.t -> t

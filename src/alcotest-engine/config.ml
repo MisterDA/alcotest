@@ -48,6 +48,23 @@ module Key = struct
     let default = true
   end
 
+  module Github_action = struct
+    type t = bool
+
+    let default =
+      let ci =
+        match Sys.getenv "CI" with
+        | "true" -> true
+        | _ | (exception Not_found) -> false
+      in
+      let github_action =
+        match Sys.getenv "GITHUB_ACTION" with
+        | exception Not_found -> false
+        | _ -> true
+      in
+      ci && github_action
+  end
+
   module Verbose = Flag (struct
     let term =
       let env = Cmd.Env.info "ALCOTEST_VERBOSE" in
@@ -228,6 +245,7 @@ module User = struct
     log_dir : Log_dir.t;
     bail : Bail.t option;
     record_backtrace : Record_backtrace.t option;
+    github_action : Github_action.t option;
   }
 
   let ( || ) a b =
@@ -244,9 +262,10 @@ module User = struct
       log_dir = merge_on (fun t -> t.log_dir);
       bail = merge_on (fun t -> t.bail);
       record_backtrace = merge_on (fun t -> t.record_backtrace);
+      github_action = merge_on (fun t -> t.github_action);
     }
 
-  let term ~and_exit ~record_backtrace =
+  let term ~and_exit ~record_backtrace ~github_action =
     let+ verbose = Verbose.term
     and+ compact = Compact.term
     and+ tail_errors = Tail_errors.term
@@ -268,13 +287,14 @@ module User = struct
       log_dir;
       bail;
       record_backtrace = Some record_backtrace;
+      github_action = Some github_action;
     }
 
   (* Lift a config-sensitive function to one that consumes optional arguments that
      override config defaults. *)
   let kcreate : 'a. (t -> 'a) -> 'a with_options =
    fun f ?and_exit ?verbose ?compact ?tail_errors ?quick_only ?show_errors ?json
-       ?filter ?log_dir ?bail ?record_backtrace ->
+       ?filter ?log_dir ?bail ?record_backtrace ?github_action ->
     f
       {
         and_exit;
@@ -288,6 +308,7 @@ module User = struct
         log_dir;
         bail;
         record_backtrace;
+        github_action;
       }
 
   let create : (unit -> t) with_options = kcreate (fun t () -> t)
@@ -295,6 +316,9 @@ module User = struct
 
   let record_backtrace t =
     Option.value ~default:Record_backtrace.default t.record_backtrace
+
+  let github_action t =
+    Option.value ~default:Github_action.default t.record_backtrace
 end
 
 let apply_defaults ~default_log_dir : User.t -> t =
@@ -310,15 +334,23 @@ let apply_defaults ~default_log_dir : User.t -> t =
        log_dir;
        bail;
        record_backtrace;
+       github_action;
      } ->
   let open Key in
+  let github_action =
+    Option.value ~default:Github_action.default github_action
+  in
+  let show_errors =
+    if github_action then true
+    else Option.value ~default:Show_errors.default show_errors
+  in
   object
     method and_exit = Option.value ~default:And_exit.default and_exit
     method verbose = Option.value ~default:Verbose.default verbose
     method compact = Option.value ~default:Compact.default compact
     method tail_errors = Option.value ~default:Tail_errors.default tail_errors
     method quick_only = Option.value ~default:Quick_only.default quick_only
-    method show_errors = Option.value ~default:Show_errors.default show_errors
+    method show_errors = show_errors
     method json = Option.value ~default:Json.default json
     method filter = filter
     method log_dir = Option.value ~default:default_log_dir log_dir
@@ -326,4 +358,6 @@ let apply_defaults ~default_log_dir : User.t -> t =
 
     method record_backtrace =
       Option.value ~default:Record_backtrace.default record_backtrace
+
+    method github_action = github_action
   end
