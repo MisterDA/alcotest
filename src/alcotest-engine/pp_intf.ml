@@ -93,5 +93,5 @@ module type Pp = sig
         Fmt.pr "Found %i item%a." n pp_plural n
       ]} *)
 
-  module Make (X : Make_arg) : S
+  module Make (_ : Make_arg) : S
 end
