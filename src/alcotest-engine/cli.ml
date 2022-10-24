@@ -38,22 +38,20 @@ module Make (P : Platform.MAKER) (M : Monad.S) :
   open Cmdliner_syntax
 
   let ci_env =
-    let values = [ "true"; "false" ] in
     let doc =
-      Printf.sprintf "Whether Alcotest is running in a CI system, must be %s."
-        (Cmdliner.Arg.doc_alts values)
+      Printf.sprintf "Whether Alcotest is running in a CI system, if set to %s."
+        (Arg.doc_quote "true")
     in
     Cmdliner.Cmd.Env.info "CI" ~doc
 
   let github_action_env =
-    let values = [ "true"; "false" ] in
     let doc =
       Printf.sprintf
-        "Whether Alcotest is running in GitHub Actions, must be %s. Display \
+        "Whether Alcotest is running in GitHub Actions, if set to %s. Display \
          tests errors and outputs GitHub Actions annotations."
-        (Cmdliner.Arg.doc_alts values)
+        (Arg.doc_quote "true")
     in
-    Cmdliner.Cmd.Env.info "GITHUB_ACTION" ~doc
+    Cmdliner.Cmd.Env.info "GITHUB_ACTIONS" ~doc
 
   let envs = [ ci_env; github_action_env ]
 

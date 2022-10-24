@@ -58,9 +58,9 @@ module Key = struct
         | _ | (exception Not_found) -> false
       in
       let github_action =
-        match Sys.getenv "GITHUB_ACTION" with
-        | exception Not_found -> false
-        | _ -> true
+        match Sys.getenv "GITHUB_ACTIONS" with
+        | "true" -> true
+        | _ | (exception Not_found) -> false
       in
       ci && github_action
   end

@@ -390,9 +390,9 @@ module Make (P : Platform.MAKER) (M : Monad.S) = struct
       | "true" -> true
       | _ | (exception Not_found) -> false
     and github_action =
-      match Sys.getenv "GITHUB_ACTION" with
-      | exception Not_found -> false
-      | _ -> true
+      match Sys.getenv "GITHUB_ACTIONS" with
+      | "true" -> true
+      | _ | (exception Not_found) -> false
     in
     let+ test_failures =
       (* Only print inside the concurrency monad *)
